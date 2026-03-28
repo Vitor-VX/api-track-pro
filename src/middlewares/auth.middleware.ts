@@ -20,8 +20,6 @@ export const jwtAuth = async (req: Request, res: Response, next: NextFunction) =
   }
   const token = header.split(" ")[1];
   try {
-    console.log(token);
-    console.log(config.JWT_SECRET);
     const payload = jwt.verify(token, config.JWT_SECRET) as TokenPayload;
     const user = await UserModel.findById(payload.id);
     if (!user) return errorResponse(res, MESSAGES.unauthorized, 401);

@@ -8,6 +8,7 @@ import siteRoutes from "./modules/sites/site.routes";
 import trackingRoutes from "./modules/tracking/routes/tracking.routes";
 import conversionRoutes from "./modules/conversions/conversion.routes";
 import metricsRoutes from "./modules/metrics/metrics.routes";
+import metaRoutes from "./modules/meta/meta.routes";
 import scriptRoutes from "./modules/script/script.routes";
 import { errorHandler } from "./middlewares/error.middleware";
 
@@ -29,6 +30,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/sites", siteRoutes);
 app.use("/api/v1/conversion", conversionRoutes);
 app.use("/api/v1/metrics", metricsRoutes);
+app.use("/api/v1/meta", metaRoutes);
 
 app.use(errorHandler);
 

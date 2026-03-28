@@ -125,6 +125,8 @@ export class MetricsService {
             const revenue = conversion?.revenue || 0;
             const conversionRate = calculatePercentage(sales, visitors);
 
+            const metaIntegration = site.integrations?.find(i => i.provider === "meta");
+
             return {
                 id: site._id,
                 name: site.name,
@@ -134,7 +136,7 @@ export class MetricsService {
                 revenue,
                 conversion: conversionRate,
                 campaignsActive: 0,
-                integrationConnected: site.metaConnected
+                integrationConnected: metaIntegration?.connected ?? false
             };
         });
 

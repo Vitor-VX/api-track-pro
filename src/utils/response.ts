@@ -12,7 +12,8 @@ export const setCookie = (res: Response, name: string, value: string, time: numb
   res.cookie(name, value, {
     httpOnly: true,
     secure: true,
-    sameSite: "strict",
+    sameSite: "lax",
+    domain: ".trackyflow.sbs",
     maxAge: time
   });
 };

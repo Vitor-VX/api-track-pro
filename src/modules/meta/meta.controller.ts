@@ -74,15 +74,24 @@ export class MetaController {
 
             const adAccountId = adAccountsRes.data?.[0]?.id;
 
-            const site = await SiteModel.findByIdAndUpdate(siteId, {
-                metaAccessToken: accessToken,
-                metaAdAccountId: adAccountId || null,
-                metaConnected: true
-            });
+            const site = await SiteModel.findById(siteId);
+            if (!site) throw new AppError("Site not found", 404);
 
-            if (!site) {
-                throw new AppError("Site not found", 404);
+            const metaIndex = site.integrations.findIndex(i => i.provider === "meta");
+            if (metaIndex >= 0) {
+                site.integrations[metaIndex].connected = true;
+                site.integrations[metaIndex].accessToken = accessToken;
+                site.integrations[metaIndex].accountId = adAccountId || undefined;
+            } else {
+                site.integrations.push({
+                    provider: "meta",
+                    connected: true,
+                    accessToken,
+                    accountId: adAccountId || undefined
+                });
             }
+
+            await site.save();
 
             res.redirect(`https://app.trackyflow.sbs/sites/${siteId}?success=meta_connected`);
         } catch (error) {

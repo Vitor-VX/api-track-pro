@@ -1,4 +1,3 @@
-import cors from "cors";
 import { NextFunction, Request, Response, Router } from "express";
 import { body, validationResult } from "express-validator";
 import { AuthController } from "./auth.controller";

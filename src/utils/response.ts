@@ -11,8 +11,8 @@ export const errorResponse = (res: Response, message: string, statusCode = 500) 
 export const setCookie = (res: Response, name: string, value: string, time: number) => {
   res.cookie(name, value, {
     httpOnly: true,
-    secure: false,
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
     maxAge: time
   });
 };

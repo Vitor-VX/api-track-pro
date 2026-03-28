@@ -15,7 +15,7 @@ export class SiteService {
   }
 
   static async getDetails(ownerId: string, siteId: string) {
-    const site = await SiteModel.findOne({ _id: siteId, ownerId }).select("-apiKey").select("-__v");
+    const site = await SiteModel.findOne({ _id: siteId, ownerId }).select("-apiKey").select("-__v").select("-integrations.accessToken");
     if (!site) throw new AppError(MESSAGES.siteNotFound, 404);
         return site;
     }

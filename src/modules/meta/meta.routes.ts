@@ -2,6 +2,7 @@ import { NextFunction, Request, Response, Router } from "express";
 import { query, validationResult } from "express-validator";
 import { MetaController } from "./meta.controller";
 import { errorResponse } from "../../utils/response";
+import { jwtAuth } from "../../middlewares/auth.middleware";
 
 const router = Router();
 
@@ -24,5 +25,7 @@ const validateCallback = [
 
 router.get("/connect", validateConnect, validate, MetaController.connect);
 router.get("/callback", validateCallback, validate, MetaController.callback);
+router.get("/campaigns/:siteId", jwtAuth, MetaController.getCampaigns);
+router.get("/summary/:siteId", jwtAuth, MetaController.getSummary);
 
 export default router;

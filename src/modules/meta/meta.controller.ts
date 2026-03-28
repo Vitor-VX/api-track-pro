@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import SiteModel from "../sites/site.model";
 import { AppError } from "../../errors/AppError";
+import { successResponse } from "../../utils/response";
+import ConversionModel from "../conversions/conversion.model";
 
 export class MetaController {
     static connect(req: Request, res: Response, next: NextFunction) {
@@ -94,6 +96,101 @@ export class MetaController {
             await site.save();
 
             res.redirect(`https://app.trackyflow.sbs/sites/${siteId}?success=meta_connected`);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    static async getCampaigns(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { siteId } = req.params;
+
+            const site = await SiteModel.findById(siteId);
+            if (!site) throw new AppError("Site not found", 404);
+
+            const meta = site.integrations.find(i => i.provider === "meta");
+            if (!meta?.connected || !meta.accessToken) {
+                throw new AppError("Meta não conectado", 400);
+            }
+
+            const campaignsRes = await fetch(
+                `https://graph.facebook.com/v23.0/${meta.accountId}/campaigns?` +
+                `fields=id,name,status,daily_budget,lifetime_budget,insights{spend,impressions,clicks,actions,cpc,cpm,cpp,frequency}&` +
+                `access_token=${meta.accessToken}`
+            ).then(r => r.json());
+
+            if (campaignsRes.error) throw new AppError(campaignsRes.error.message, 502);
+
+            const campaigns = campaignsRes.data.map((c: any) => {
+                const insights = c.insights?.data?.[0] || {};
+                const spend = Number(insights.spend || 0);
+                const clicks = Number(insights.clicks || 0);
+                const impressions = Number(insights.impressions || 0);
+                const purchases = insights.actions?.find((a: any) => a.action_type === "purchase");
+                const sales = Number(purchases?.value || 0);
+                const revenue = sales * 0;
+
+                return {
+                    id: c.id,
+                    name: c.name,
+                    status: c.status === "ACTIVE" ? "active" : "paused",
+                    spend,
+                    impressions,
+                    clicks,
+                    sales,
+                    revenue,
+                    cpc: Number(insights.cpc || 0),
+                    cpm: Number(insights.cpm || 0),
+                    roi: spend > 0 ? revenue / spend : 0
+                };
+            });
+
+            return successResponse(res, campaigns);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    static async getSummary(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { siteId } = req.params;
+
+            const site = await SiteModel.findById(siteId);
+            if (!site) throw new AppError("Site not found", 404);
+            const meta = site?.integrations.find(i => i.provider === "meta");
+
+            if (!meta?.connected || !meta.accessToken) {
+                throw new AppError("Meta não conectado", 400);
+            }
+
+            const summaryRes = await fetch(
+                `https://graph.facebook.com/v23.0/${meta.accountId}/insights?` +
+                `fields=spend,impressions,clicks,actions,cpc,cpm&` +
+                `date_preset=last_30d&` +
+                `access_token=${meta.accessToken}`
+            ).then(r => r.json());
+
+            const insights = summaryRes.data?.[0] || {};
+            const purchases = insights.actions?.find((a: any) => a.action_type === "purchase");
+            const spend = Number(insights.spend || 0);
+            const sales = Number(purchases?.value || 0);
+
+            const conversions = await ConversionModel.aggregate([
+                { $match: { siteId: site._id } },
+                { $group: { _id: null, revenue: { $sum: "$value" } } }
+            ]);
+            const revenue = conversions[0]?.revenue || 0;
+            const roas = spend > 0 ? revenue / spend : 0;
+
+            return successResponse(res, {
+                spend,
+                impressions: Number(insights.impressions || 0),
+                clicks: Number(insights.clicks || 0),
+                sales,
+                cpc: Number(insights.cpc || 0),
+                cpm: Number(insights.cpm || 0),
+                roas
+            } as any);
         } catch (error) {
             next(error);
         }

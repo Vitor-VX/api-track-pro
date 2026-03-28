@@ -22,7 +22,7 @@ export class MetaController {
             const url = new URL("https://www.facebook.com/dialog/oauth");
             url.searchParams.set("client_id", appId);
             url.searchParams.set("redirect_uri", redirectUri);
-            url.searchParams.set("scope", "ads_read,read_insights");
+            url.searchParams.set("scope", "ads_read,ads_management");
             url.searchParams.set("state", siteId);
 
             res.redirect(url.toString());

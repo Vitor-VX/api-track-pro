@@ -13,7 +13,7 @@ export const setCookie = (res: Response, name: string, value: string, time: numb
     httpOnly: true,
     secure: true,
     sameSite: "lax",
-    domain: ".trackyflow.sbs",
+    // domain: "/",
     maxAge: time
   });
 };

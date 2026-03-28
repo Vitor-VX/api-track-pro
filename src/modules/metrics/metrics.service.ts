@@ -61,7 +61,7 @@ export class MetricsService {
     }
 
     static async overviewDashboard(userId: string) {
-        const sites = await SiteModel.find({ ownerId: userId }).select("_id name domain metaConnected");
+        const sites = await SiteModel.find({ ownerId: userId }).select("_id name domain integrations");
         const siteIds = sites.map((s: IdItem) => s._id);
 
         const todayRange = {

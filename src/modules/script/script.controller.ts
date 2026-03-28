@@ -59,7 +59,7 @@ export class ScriptController {
           utm: options.utm || getUTMs()
         };
 
-        fetch("https://trackyflow.sbs/api/v1/track", {
+        fetch("https://api.trackyflow.sbs/api/v1/track", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)

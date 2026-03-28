@@ -20,7 +20,7 @@ app.use("/api/v1/track", trackingRoutes);
 app.use("/api/v1/script", scriptRoutes);
 
 app.use(cors({
-    origin: "http://localhost:5173",
+    origin: process.env.URL_SITE,
     credentials: true
 }));
 

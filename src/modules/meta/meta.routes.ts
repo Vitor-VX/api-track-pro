@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response, Router } from "express";
-import { query, validationResult } from "express-validator";
+import { query, body, validationResult } from "express-validator";
 import { MetaController } from "./meta.controller";
 import { errorResponse } from "../../utils/response";
 import { jwtAuth } from "../../middlewares/auth.middleware";
@@ -23,8 +23,13 @@ const validateCallback = [
     query("state").notEmpty().withMessage("state is required").isMongoId().withMessage("state must be a valid Mongo ID")
 ];
 
+const validateToken = [
+    body("accessToken").notEmpty().withMessage("accessToken is required")
+];
+
 router.get("/connect", validateConnect, validate, MetaController.connect);
 router.get("/callback", validateCallback, validate, MetaController.callback);
+router.post("/token/:siteId", jwtAuth, validateToken, validate, MetaController.saveToken);
 router.get("/campaigns/:siteId", jwtAuth, MetaController.getCampaigns);
 router.get("/summary/:siteId", jwtAuth, MetaController.getSummary);
 

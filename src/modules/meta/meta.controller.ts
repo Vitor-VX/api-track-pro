@@ -151,6 +151,49 @@ export class MetaController {
         }
     }
 
+    static async saveToken(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { siteId } = req.params;
+            const { accessToken } = req.body;
+
+            const test = await fetch(
+                `https://graph.facebook.com/v23.0/me?access_token=${accessToken}`
+            ).then(r => r.json());
+
+            if (test.error) throw new AppError("Token inválido", 400);
+            const adAccountsRes = await fetch(
+                `https://graph.facebook.com/v23.0/me/adaccounts?fields=id,name&access_token=${accessToken}`
+            ).then(r => r.json());
+
+            if (adAccountsRes.error) throw new AppError("Erro ao buscar contas de anúncio", 502);
+
+            const adAccountId = adAccountsRes.data?.[0]?.id;
+            if (!adAccountId) throw new AppError("Nenhuma conta de anúncio encontrada", 404);
+
+            const site = await SiteModel.findById(siteId);
+            if (!site) throw new AppError("Site not found", 404);
+
+            const metaIndex = site.integrations.findIndex(i => i.provider === "meta");
+            if (metaIndex >= 0) {
+                site.integrations[metaIndex].connected = true;
+                site.integrations[metaIndex].accessToken = accessToken;
+                site.integrations[metaIndex].accountId = adAccountId;
+            } else {
+                site.integrations.push({
+                    provider: "meta",
+                    connected: true,
+                    accessToken,
+                    accountId: adAccountId
+                });
+            }
+
+            await site.save();
+            return successResponse(res, "Meta conectado com sucesso");
+        } catch (error) {
+            next(error);
+        }
+    }
+
     static async getSummary(req: Request, res: Response, next: NextFunction) {
         try {
             const { siteId } = req.params;

@@ -55,6 +55,7 @@ interface CampaignResult {
     cpc: number;
     cpm: number;
     ctr: number;
+    cpa: number;
     roi: number;
 }
 
@@ -178,6 +179,7 @@ function mapCampaign(
         cpc: Number(insights.cpc || 0),
         cpm: Number(insights.cpm || 0),
         ctr: impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : 0,
+        cpa: sales > 0 ? Number((spend / sales).toFixed(2)) : 0,
         roi: spend > 0 ? revenue / spend : 0
     };
 }

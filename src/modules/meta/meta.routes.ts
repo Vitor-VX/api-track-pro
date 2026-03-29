@@ -1,14 +1,10 @@
 import { NextFunction, Request, Response, Router } from "express";
-import { query, body, validationResult } from "express-validator";
+import { body, validationResult } from "express-validator";
 import { MetaController } from "./meta.controller";
 import { errorResponse } from "../../utils/response";
 import { jwtAuth } from "../../middlewares/auth.middleware";
 
 const router = Router();
-
-const validateConnect = [
-    query("site_id").notEmpty().withMessage("site_id is required").isMongoId().withMessage("site_id must be a valid Mongo ID")
-];
 
 const validate = (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);
@@ -18,18 +14,11 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
     next();
 };
 
-const validateCallback = [
-    query("code").notEmpty().withMessage("code is required"),
-    query("state").notEmpty().withMessage("state is required").isMongoId().withMessage("state must be a valid Mongo ID")
-];
-
 const validateToken = [
     body("accessToken").notEmpty().withMessage("accessToken is required"),
     body("pixelId").notEmpty().withMessage("pixelId is required")
 ];
 
-router.get("/connect", validateConnect, validate, MetaController.connect);
-router.get("/callback", validateCallback, validate, MetaController.callback);
 router.post("/token/:siteId", jwtAuth, validateToken, validate, MetaController.saveToken);
 router.get("/campaigns/:siteId", jwtAuth, MetaController.getCampaigns);
 router.get("/summary/:siteId", jwtAuth, MetaController.getSummary);

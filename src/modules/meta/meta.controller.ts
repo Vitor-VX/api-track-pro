@@ -3,6 +3,7 @@ import SiteModel from "../sites/site.model";
 import { AppError } from "../../errors/AppError";
 import { successResponse } from "../../utils/response";
 import ConversionModel from "../conversions/conversion.model";
+import SessionModel from "../tracking/models/session.model";
 
 export class MetaController {
     static connect(req: Request, res: Response, next: NextFunction) {
@@ -113,39 +114,90 @@ export class MetaController {
                 throw new AppError("Meta não conectado", 400);
             }
 
-            const campaignsRes = await fetch(
-                `https://graph.facebook.com/v23.0/${meta.accountId}/campaigns?` +
-                `fields=id,name,status,daily_budget,lifetime_budget,insights{spend,impressions,clicks,actions,cpc,cpm,cpp,frequency}&` +
+            const pixelId = meta.settings?.pixelId;
+
+            const adAccountsRes = await fetch(
+                `https://graph.facebook.com/v23.0/me/adaccounts?` +
+                `fields=id,name,campaigns{id,name,status,insights{spend,impressions,clicks,actions,cpc,cpm},adsets{promoted_object}}&` +
                 `access_token=${meta.accessToken}`
             ).then(r => r.json());
 
-            if (campaignsRes.error) throw new AppError(campaignsRes.error.message, 502);
+            const campaignStats = await SessionModel.aggregate([
+                {
+                    $match: {
+                        siteId: site._id,
+                        "utm.utm_campaign": { $exists: true, $ne: null }
+                    }
+                },
+                {
+                    $addFields: {
+                        campaignId: {
+                            $cond: {
+                                if: { $gt: [{ $indexOfBytes: ["$utm.utm_campaign", "|"] }, -1] },
+                                then: { $arrayElemAt: [{ $split: ["$utm.utm_campaign", "|"] }, 1] },
+                                else: "$utm.utm_campaign"
+                            }
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$campaignId",
+                        visits: { $sum: 1 }
+                    }
+                }
+            ]);
 
-            const campaigns = campaignsRes.data.map((c: any) => {
-                const insights = c.insights?.data?.[0] || {};
-                const spend = Number(insights.spend || 0);
-                const clicks = Number(insights.clicks || 0);
-                const impressions = Number(insights.impressions || 0);
-                const purchases = insights.actions?.find((a: any) => a.action_type === "purchase");
-                const sales = Number(purchases?.value || 0);
-                const revenue = sales * 0;
+            // console.log("visitsByCampaignId:", campaignStats);
+            const visitsByCampaignId = Object.fromEntries(
+                campaignStats
+                    .filter((s: any) => s._id)
+                    .map((s: any) => [s._id, s.visits])
+            );
 
-                return {
-                    id: c.id,
-                    name: c.name,
-                    status: c.status === "ACTIVE" ? "active" : "paused",
-                    spend,
-                    impressions,
-                    clicks,
-                    sales,
-                    revenue,
-                    cpc: Number(insights.cpc || 0),
-                    cpm: Number(insights.cpm || 0),
-                    roi: spend > 0 ? revenue / spend : 0
-                };
-            });
+            const allCampaigns: any[] = [];
 
-            return successResponse(res, campaigns);
+            for (const account of adAccountsRes.data || []) {
+                const filtered = (account.campaigns?.data || []).filter((c: any) => {
+                    if (!pixelId) return true;
+                    return c.adsets?.data?.some((adset: any) =>
+                        adset.promoted_object?.pixel_id === pixelId
+                    );
+                });
+
+                allCampaigns.push(...filtered
+                    .filter((c: any) => c.status === "ACTIVE" || visitsByCampaignId[c.id] > 0)
+                    .map((c: any) => {
+                        const insights = c.insights?.data?.[0] || {};
+                        const spend = Number(insights.spend || 0);
+                        const clicks = Number(insights.clicks || 0);
+                        const impressions = Number(insights.impressions || 0);
+                        const purchases = insights.actions?.find((a: any) => a.action_type === "purchase");
+                        const sales = Number(purchases?.value || 0);
+                        const visits = visitsByCampaignId[c.id] || 0;
+                        const revenue = sales * 0;
+
+                        return {
+                            id: c.id,
+                            name: c.name,
+                            status: c.status === "ACTIVE" ? "active" : "paused",
+                            account: account.name,
+                            spend,
+                            impressions,
+                            clicks,
+                            visits,
+                            sales,
+                            revenue,
+                            cpc: Number(insights.cpc || 0),
+                            cpm: Number(insights.cpm || 0),
+                            ctr: impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : 0,
+                            roi: spend > 0 ? revenue / spend : 0
+                        };
+                    })
+                );
+            }
+
+            return successResponse(res, "Campanhas obtidas.", allCampaigns);
         } catch (error) {
             next(error);
         }
@@ -154,18 +206,17 @@ export class MetaController {
     static async saveToken(req: Request, res: Response, next: NextFunction) {
         try {
             const { siteId } = req.params;
-            const { accessToken } = req.body;
+            const { accessToken, pixelId } = req.body;
 
             const test = await fetch(
                 `https://graph.facebook.com/v23.0/me?access_token=${accessToken}`
             ).then(r => r.json());
 
             if (test.error) throw new AppError("Token inválido", 400);
+
             const adAccountsRes = await fetch(
                 `https://graph.facebook.com/v23.0/me/adaccounts?fields=id,name&access_token=${accessToken}`
             ).then(r => r.json());
-
-            if (adAccountsRes.error) throw new AppError("Erro ao buscar contas de anúncio", 502);
 
             const adAccountId = adAccountsRes.data?.[0]?.id;
             if (!adAccountId) throw new AppError("Nenhuma conta de anúncio encontrada", 404);
@@ -178,12 +229,14 @@ export class MetaController {
                 site.integrations[metaIndex].connected = true;
                 site.integrations[metaIndex].accessToken = accessToken;
                 site.integrations[metaIndex].accountId = adAccountId;
+                site.integrations[metaIndex].settings = { pixelId: pixelId || null };
             } else {
                 site.integrations.push({
                     provider: "meta",
                     connected: true,
                     accessToken,
-                    accountId: adAccountId
+                    accountId: adAccountId,
+                    settings: { pixelId: pixelId || null }
                 });
             }
 

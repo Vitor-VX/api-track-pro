@@ -24,7 +24,8 @@ const validateCallback = [
 ];
 
 const validateToken = [
-    body("accessToken").notEmpty().withMessage("accessToken is required")
+    body("accessToken").notEmpty().withMessage("accessToken is required"),
+    body("pixelId").notEmpty().withMessage("pixelId is required")
 ];
 
 router.get("/connect", validateConnect, validate, MetaController.connect);

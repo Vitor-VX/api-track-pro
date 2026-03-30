@@ -19,8 +19,16 @@ const validateToken = [
     body("pixelId").notEmpty().withMessage("pixelId is required")
 ];
 
+const validatePurchase = [
+    body("value").notEmpty().withMessage("value is required"),
+    body("orderId").notEmpty().withMessage("orderId is required"),
+    body("email").notEmpty().withMessage("email is required"),
+    body("phone").notEmpty().withMessage("phone is required")
+];
+
 router.post("/token/:siteId", jwtAuth, validateToken, validate, MetaController.saveToken);
 router.get("/campaigns/:siteId", jwtAuth, MetaController.getCampaigns);
 router.get("/summary/:siteId", jwtAuth, MetaController.getSummary);
+router.post("/send-purchase/:siteId", jwtAuth, validatePurchase, validate, MetaController.sendPurchaseEvent);
 
 export default router;

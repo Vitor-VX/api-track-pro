@@ -191,12 +191,112 @@ function filterByPixel(campaigns: MetaCampaign[], pixelId?: string): MetaCampaig
     );
 }
 
+import crypto from "crypto";
+
+function hash(value: string) {
+    return crypto
+        .createHash("sha256")
+        .update(value.trim().toLowerCase())
+        .digest("hex");
+}
+
+async function sendPurchaseToMeta({
+    pixelId,
+    accessToken,
+    value,
+    orderId,
+    email,
+    phone,
+    req
+}: {
+    pixelId: string;
+    accessToken: string;
+    value: number;
+    orderId: string;
+    email?: string;
+    phone?: string;
+    req: Request;
+}) {
+    const payload = {
+        data: [
+            {
+                event_name: "Purchase",
+                event_time: Math.floor(Date.now() / 1000),
+                event_id: orderId,
+                action_source: "website",
+
+                user_data: {
+                    ...(email && { em: hash(email) }),
+                    ...(phone && { ph: hash(phone) }),
+                    client_ip_address: req.ip,
+                    client_user_agent: req.headers["user-agent"]
+                },
+
+                custom_data: {
+                    value,
+                    currency: "BRL"
+                }
+            }
+        ]
+    };
+
+    try {
+        const res = await fetch(
+            `https://graph.facebook.com/v23.0/${pixelId}/events?access_token=${accessToken}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+
+        const data = await res.json();
+        if (data.error) {
+            console.error("Meta API error:", data.error);
+        }
+
+        return data;
+    } catch (err) {
+        console.error("Meta send error:", err);
+    }
+}
+
 export class MetaController {
+
+    static async sendPurchaseEvent(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { siteId } = req.params;
+            const { value, orderId, email, phone } = req.body;
+
+            const site = await SiteModel.findById(siteId);
+            if (!site) throw new AppError("Site not found", 404);
+
+            const meta = site.integrations.find(i => i.provider === "meta");
+
+            if (!meta?.connected || !meta.accessToken || !meta.settings?.pixelId) {
+                throw new AppError("Meta não conectado corretamente", 400);
+            }
+
+            await sendPurchaseToMeta({
+                pixelId: meta.settings.pixelId,
+                accessToken: meta.accessToken,
+                value,
+                orderId,
+                email,
+                phone,
+                req
+            });
+
+            return successResponse(res, "Evento enviado para Meta com sucesso");
+        } catch (error) {
+            next(error);
+        }
+    }
 
     static async getCampaigns(req: Request, res: Response, next: NextFunction) {
         try {
             const { siteId } = req.params;
-            const preset = (req.query.preset as DatePreset) || "today"; // padrão: hoje
+            const preset = (req.query.preset as DatePreset) || "today";
             const dateRange = getDateRange(preset);
 
             const site = await SiteModel.findById(siteId);

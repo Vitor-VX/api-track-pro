@@ -110,6 +110,49 @@ async function fetchActiveCampaigns(
     return res.data || [];
 }
 
+async function fetchRevenueByCampaignId(
+    siteId: any,
+    dateRange: DateRange
+): Promise<Record<string, number>> {
+    const stats = await ConversionModel.aggregate([
+        {
+            $match: {
+                siteId,
+                createdAt: {
+                    $gte: new Date(dateRange.since),
+                    $lte: new Date(dateRange.until + "T23:59:59.999Z")
+                },
+                "utm.utm_campaign": { $exists: true, $ne: null }
+            }
+        },
+        {
+            $addFields: {
+                campaignId: {
+                    $cond: {
+                        if: { $gt: [{ $indexOfBytes: ["$utm.utm_campaign", "|"] }, -1] },
+                        then: { $arrayElemAt: [{ $split: ["$utm.utm_campaign", "|"] }, 1] },
+                        else: "$utm.utm_campaign"
+                    }
+                }
+            }
+        },
+        {
+            $group: {
+                _id: "$campaignId",
+                revenue: { $sum: "$value" },
+                sales: { $sum: 1 }
+            }
+        }
+    ]);
+
+    return Object.fromEntries(
+        stats.map((s: any) => [
+            s._id,
+            { revenue: s.revenue, sales: s.sales }
+        ])
+    );
+}
+
 async function fetchVisitsByCampaignId(
     siteId: any,
     dateRange: DateRange
@@ -154,16 +197,18 @@ async function fetchVisitsByCampaignId(
 function mapCampaign(
     campaign: MetaCampaign,
     account: MetaAdAccount,
-    visitsByCampaignId: Record<string, number>
+    visitsByCampaignId: Record<string, number>,
+    revenueByCampaignId: any
 ): CampaignResult {
     const insights = campaign.insights?.data?.[0] || {};
     const spend = Number(insights.spend || 0);
     const clicks = Number(insights.clicks || 0);
     const impressions = Number(insights.impressions || 0);
-    const purchases = insights.actions?.find(a => a.action_type === "purchase");
-    const sales = Number(purchases?.value || 0);
     const visits = visitsByCampaignId[campaign.id] || 0;
-    const revenue = 0;
+    const campaignData = revenueByCampaignId[campaign.id] || { revenue: 0, sales: 0 };
+
+    const revenue = campaignData.revenue;
+    const sales = campaignData.sales;
 
     return {
         id: campaign.id,
@@ -335,9 +380,10 @@ export class MetaController {
                 throw new AppError("Meta não conectado", 400);
             }
 
-            const [adAccounts, visitsByCampaignId] = await Promise.all([
+            const [adAccounts, visitsByCampaignId, revenueByCampaignId] = await Promise.all([
                 fetchAdAccounts(meta.accessToken),
-                fetchVisitsByCampaignId(site._id, dateRange)
+                fetchVisitsByCampaignId(site._id, dateRange),
+                fetchRevenueByCampaignId(site._id, dateRange)
             ]);
 
             const allCampaigns: CampaignResult[] = [];
@@ -345,7 +391,7 @@ export class MetaController {
             for (const account of adAccounts) {
                 const campaigns = await fetchActiveCampaigns(account.id, meta.accessToken, dateRange);
                 const filtered = filterByPixel(campaigns, meta.settings?.pixelId);
-                allCampaigns.push(...filtered.map(c => mapCampaign(c, account, visitsByCampaignId)));
+                allCampaigns.push(...filtered.map(c => mapCampaign(c, account, visitsByCampaignId, revenueByCampaignId)));
             }
 
             return successResponse(res, "Campanhas obtidas.", allCampaigns);

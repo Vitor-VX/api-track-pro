@@ -7,9 +7,22 @@ import { errorResponse } from "../../utils/response";
 const router = Router();
 
 const validateCreateConversion = [
-  body("value").notEmpty().withMessage("Value is required").isNumeric().withMessage("Value must be numeric"),
-  body("currency").notEmpty().withMessage("Currency is required").isString().trim(),
-  body("event").notEmpty().withMessage("Event is required").isString().trim()
+  body("value").notEmpty().isNumeric(),
+  body("currency").notEmpty().isString().trim(),
+  body("event").notEmpty().isString().trim(),
+
+  body("orderId").optional().isString(),
+
+  body("fbc").optional().isString(),
+  body("fbp").optional().isString(),
+
+  body("utm").optional().isObject(),
+
+  body("utm.utm_source").optional().isString(),
+  body("utm.utm_medium").optional().isString(),
+  body("utm.utm_campaign").optional().isString(),
+  body("utm.utm_content").optional().isString(),
+  body("utm.utm_term").optional().isString()
 ];
 
 const validate = (req: Request, res: Response, next: NextFunction) => {
@@ -20,6 +33,6 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
-router.post("/",apiKeyAuth, validateCreateConversion, validate, ConversionController.create);
+router.post("/", apiKeyAuth, validateCreateConversion, validate, ConversionController.create);
 
 export default router;

@@ -23,7 +23,11 @@ const validatePurchase = [
     body("value").notEmpty().withMessage("value is required"),
     body("orderId").notEmpty().withMessage("orderId is required"),
     body("email").notEmpty().withMessage("email is required"),
-    body("phone").notEmpty().withMessage("phone is required")
+    body("phone").notEmpty().withMessage("phone is required"),
+    body("fbc").optional(),
+    body("fbp").optional(),
+    body("userAgent").optional(),
+    body("clientIp").optional(),
 ];
 
 router.post("/token/:siteId", jwtAuth, validateToken, validate, MetaController.saveToken);

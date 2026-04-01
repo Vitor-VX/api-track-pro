@@ -207,6 +207,10 @@ async function sendPurchaseToMeta({
     orderId,
     email,
     phone,
+    fbc,
+    fbp,
+    clientIp,
+    userAgent,
     req
 }: {
     pixelId: string;
@@ -215,6 +219,10 @@ async function sendPurchaseToMeta({
     orderId: string;
     email?: string;
     phone?: string;
+    fbc?: string;
+    fbp?: string;
+    clientIp?: string;
+    userAgent?: string;
     req: Request;
 }) {
     const payload = {
@@ -228,14 +236,21 @@ async function sendPurchaseToMeta({
                 user_data: {
                     ...(email && { em: hash(email) }),
                     ...(phone && { ph: hash(phone) }),
-                    client_ip_address: req.ip,
-                    client_user_agent: req.headers["user-agent"]
+                    client_ip_address: clientIp,
+                    client_user_agent: userAgent,
+                    fbc,
+                    fbp
                 },
 
                 custom_data: {
                     value,
-                    currency: "BRL"
-                }
+                    currency: "BRL",
+                    content_ids: [
+                        `product-${orderId}`
+                    ],
+                    content_type: "product"
+                },
+                opt_out: false
             }
         ]
     };
@@ -266,7 +281,16 @@ export class MetaController {
     static async sendPurchaseEvent(req: Request, res: Response, next: NextFunction) {
         try {
             const { siteId } = req.params;
-            const { value, orderId, email, phone } = req.body;
+            const {
+                value,
+                orderId,
+                email,
+                fbc,
+                fbp,
+                userAgent,
+                clientIp,
+                phone
+            } = req.body;
 
             const site = await SiteModel.findById(siteId);
             if (!site) throw new AppError("Site not found", 404);
@@ -284,6 +308,10 @@ export class MetaController {
                 orderId,
                 email,
                 phone,
+                fbc,
+                fbp,
+                clientIp,
+                userAgent,
                 req
             });
 

@@ -4,6 +4,24 @@ export class ScriptController {
     static async serve(req: Request, res: Response, next: NextFunction) {
         try {
             const script = `(() => {
+
+      function getSession() {
+        const SESSION_TIMEOUT = 30 * 60 * 1000;
+        let session = JSON.parse(localStorage.getItem("track-session") || "null");
+        const now = Date.now();
+
+        if (!session || (now - session.lastActivity > SESSION_TIMEOUT)) {
+          session = {
+            sessionId: crypto.randomUUID(),
+            lastActivity: now
+          };
+        } else {
+          session.lastActivity = now;
+        }
+
+        localStorage.setItem("track-session", JSON.stringify(session));
+        return session.sessionId;
+      }
       const currentScript = document.currentScript;
       const SITE_ID = "${req.query.siteId}";
 
@@ -37,8 +55,7 @@ export class ScriptController {
       let visitorId = localStorage.getItem("track-visitor-id") || crypto.randomUUID();
       localStorage.setItem("track-visitor-id", visitorId);
 
-      let sessionId = sessionStorage.getItem("track-session-id") || crypto.randomUUID();
-      sessionStorage.setItem("track-session-id", sessionId);
+      let sessionId = getSession();
 
       window.sendEvent = function (eventType, options = {}) {
         const payload = {

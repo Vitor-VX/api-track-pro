@@ -178,13 +178,13 @@ export class MetricsService {
 
         const sessions = await SessionModel.aggregate([
             { $match: { siteId: { $in: sites }, createdAt: { $gte: days[0], $lte: endOfToday() } } },
-            { $project: { day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } } },
+            { $project: { day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'America/Sao_Paulo' } } } },
             { $group: { _id: '$day', visits: { $sum: 1 } } }
         ]);
 
         const conversions = await ConversionModel.aggregate([
             { $match: { siteId: { $in: sites }, createdAt: { $gte: days[0], $lte: endOfToday() } } },
-            { $project: { day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } } },
+            { $project: { day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'America/Sao_Paulo' } } } },
             { $group: { _id: '$day', sales: { $sum: 1 } } }
         ]);
 

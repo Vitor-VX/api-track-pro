@@ -4,6 +4,7 @@ import { successResponse } from "../../utils/response";
 import SiteModel from "../sites/site.model";
 import ConversionModel from "../conversions/conversion.model";
 import SessionModel from "../tracking/models/session.model";
+import moment from "moment-timezone";
 
 type DatePreset = "today" | "yesterday" | "last_7d" | "last_30d" | "last_90d";
 
@@ -59,22 +60,32 @@ interface CampaignResult {
     roi: number;
 }
 
+const TZ = "America/Sao_Paulo";
+
 function getDateRange(preset: DatePreset = "today"): DateRange {
-    const now = new Date();
-    const today = now.toISOString().split("T")[0];
+    const now = moment().tz(TZ);
 
-    const daysAgo = (n: number) => {
-        const d = new Date(now);
-        d.setDate(d.getDate() - n);
-        return d.toISOString().split("T")[0];
-    };
-
-    const ranges: Record<DatePreset, DateRange> = {
-        today: { since: today, until: today },
-        yesterday: { since: daysAgo(1), until: daysAgo(1) },
-        last_7d: { since: daysAgo(7), until: today },
-        last_30d: { since: daysAgo(30), until: today },
-        last_90d: { since: daysAgo(90), until: today },
+    const ranges = {
+        today: {
+            since: now.clone().startOf("day").toISOString(),
+            until: now.clone().endOf("day").toISOString()
+        },
+        yesterday: {
+            since: now.clone().subtract(1, "day").startOf("day").toISOString(),
+            until: now.clone().subtract(1, "day").endOf("day").toISOString()
+        },
+        last_7d: {
+            since: now.clone().subtract(7, "day").startOf("day").toISOString(),
+            until: now.clone().endOf("day").toISOString()
+        },
+        last_30d: {
+            since: now.clone().subtract(30, "day").startOf("day").toISOString(),
+            until: now.clone().endOf("day").toISOString()
+        },
+        last_90d: {
+            since: now.clone().subtract(90, "day").startOf("day").toISOString(),
+            until: now.clone().endOf("day").toISOString()
+        }
     };
 
     return ranges[preset];
@@ -120,7 +131,7 @@ async function fetchRevenueByCampaignId(
                 siteId,
                 createdAt: {
                     $gte: new Date(dateRange.since),
-                    $lte: new Date(dateRange.until + "T23:59:59.999Z")
+                    $lte: new Date(dateRange.until)
                 },
                 "utm.utm_campaign": { $exists: true, $ne: null }
             }

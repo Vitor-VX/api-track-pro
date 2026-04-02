@@ -7,6 +7,7 @@ import { Types } from "mongoose";
 import { ISessionDocument } from "../tracking/interfaces/session.interface";
 import { AppError } from "../../errors/AppError";
 import { MESSAGES } from "../../constants/messages";
+import moment from "moment-timezone";
 
 type IdItem = { _id: Types.ObjectId };
 type CountItem = { _id: string; count: number };
@@ -189,7 +190,9 @@ export class MetricsService {
         ]);
 
         return days.map((d) => {
-            const dayKey = d.toISOString().split('T')[0];
+            const dayKey = moment(d)
+                .tz("America/Sao_Paulo")
+                .format("YYYY-MM-DD");
             const visits = sessions.find((i: DayStat) => i._id === dayKey)?.visits || 0;
             const sales = conversions.find((i: DayStat) => i._id === dayKey)?.sales || 0;
             return { date: dayKey, visits, sales };

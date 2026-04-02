@@ -70,6 +70,10 @@ export class MetricsService {
             $lte: endOfToday()
         };
 
+        console.log(todayRange.$gte);
+        console.log(todayRange.$lte);
+        
+
         const visitorsToday = await SessionModel.countDocuments({
             siteId: { $in: siteIds },
             createdAt: todayRange

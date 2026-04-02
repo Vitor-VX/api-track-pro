@@ -108,8 +108,8 @@ async function fetchActiveCampaigns(
     ]));
 
     const timeRange = encodeURIComponent(JSON.stringify({
-        since: dateRange.since,
-        until: dateRange.until
+        since: moment(dateRange.since).tz(TZ).format("YYYY-MM-DD"),
+        until: moment(dateRange.until).tz(TZ).format("YYYY-MM-DD")
     }));
 
     const res = await fetch(
@@ -175,7 +175,7 @@ async function fetchVisitsByCampaignId(
                 "utm.utm_campaign": { $exists: true, $ne: null },
                 createdAt: {
                     $gte: new Date(dateRange.since),
-                    $lte: new Date(dateRange.until + "T23:59:59.999Z")
+                    $lte: new Date(dateRange.until)
                 }
             }
         },
@@ -426,8 +426,8 @@ export class MetaController {
             }
 
             const timeRange = encodeURIComponent(JSON.stringify({
-                since: dateRange.since,
-                until: dateRange.until
+                since: moment(dateRange.since).tz(TZ).format("YYYY-MM-DD"),
+                until: moment(dateRange.until).tz(TZ).format("YYYY-MM-DD")
             }));
 
             const [summaryRes, conversions] = await Promise.all([

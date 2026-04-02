@@ -1,5 +1,7 @@
+import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
 
+const TZ = "America/Sao_Paulo";
 export const generateApiKey = (): string => uuidv4();
 
 export const calculatePercentage = (part: number, total: number): number => {
@@ -8,24 +10,25 @@ export const calculatePercentage = (part: number, total: number): number => {
 };
 
 export const startOfToday = (): Date => {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now;
+  return moment.tz(TZ).startOf("day").utc().toDate();
 };
 
 export const endOfToday = (): Date => {
-  const now = new Date();
-  now.setHours(23, 59, 59, 999);
-  return now;
+  return moment.tz(TZ).endOf("day").utc().toDate();
 };
 
 export const last7Days = (): Date[] => {
   const days: Date[] = [];
-  for (let i = 6; i >= 0; i -= 1) {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() - i);
-    days.push(d);
+
+  for (let i = 6; i >= 0; i--) {
+    const date = moment
+      .tz(TZ)
+      .startOf("day")
+      .subtract(i, "days")
+      .utc()
+      .toDate();
+
+    days.push(date);
   }
   return days;
 };

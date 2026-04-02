@@ -343,51 +343,109 @@ export class MetricsService {
             : (await SiteModel.find({ ownerId: userId }).select('_id'))
                 .map((s: IdItem) => s._id);
 
-        const sessions = await SessionModel.find({ siteId: { $in: sites } });
-        const all = sessions.length;
+        const todayRange = {
+            $gte: startOfToday(),
+            $lte: endOfToday()
+        };
 
-        const totalDuration = sessions.reduce(
-            (acc: number, s: ISessionDocument) =>
-                acc + (s.lastActivityAt.getTime() - s.createdAt.getTime()),
-            0
-        );
+        const sessionStats = await SessionModel.aggregate([
+            {
+                $match: {
+                    siteId: { $in: sites },
+                    createdAt: todayRange
+                }
+            },
+            {
+                $project: {
+                    duration: {
+                        $subtract: ["$lastActivityAt", "$createdAt"]
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalSessions: { $sum: 1 },
+                    totalDuration: { $sum: "$duration" },
+                    bounceCount: {
+                        $sum: {
+                            $cond: [{ $lt: ["$duration", 15000] }, 1, 0]
+                        }
+                    }
+                }
+            }
+        ]);
+
+        const sessionData = sessionStats[0] || {
+            totalSessions: 0,
+            totalDuration: 0,
+            bounceCount: 0
+        };
+
+        const all = sessionData.totalSessions;
 
         const avgTime = all
-            ? Math.round(totalDuration / all / 1000)
+            ? Math.round(sessionData.totalDuration / all / 1000)
             : 0;
-        const scrollSessions = await EventModel.distinct("sessionId", {
-            siteId: { $in: sites },
-            type: /scroll/i
-        });
-        const scrollRate = calculatePercentage(scrollSessions.length, all);
 
-        const ctaClicks = await EventModel.countDocuments({
-            siteId: { $in: sites },
-            type: "cta_click"
-        });
+        const rejectionRate = calculatePercentage(sessionData.bounceCount, all);
+        const eventStats = await EventModel.aggregate([
+            {
+                $match: {
+                    siteId: { $in: sites },
+                    createdAt: todayRange
+                }
+            },
+            {
+                $group: {
+                    _id: "$type",
+                    count: { $sum: 1 },
+                    sessions: { $addToSet: "$sessionId" }
+                }
+            }
+        ]);
 
-        const pageViews = await EventModel.countDocuments({
-            siteId: { $in: sites },
-            type: "page_view"
-        });
+        let scrollSessionsCount = 0;
+        let ctaClicks = 0;
+        let pageViews = 0;
+        let checkoutStart = 0;
 
+        for (const stat of eventStats) {
+            const type = stat._id?.toLowerCase();
+
+            if (type?.includes("scroll")) {
+                scrollSessionsCount = stat.sessions.length;
+            }
+
+            if (type === "cta_click") {
+                ctaClicks = stat.count;
+            }
+
+            if (type === "page_view") {
+                pageViews = stat.count;
+            }
+
+            if (type === "checkout_start") {
+                checkoutStart = stat.count;
+            }
+        }
+
+        const scrollRate = calculatePercentage(scrollSessionsCount, all);
         const ctaRate = calculatePercentage(ctaClicks, pageViews);
 
-        const bounce = sessions.filter(
-            (s: ISessionDocument) =>
-                s.lastActivityAt.getTime() - s.createdAt.getTime() < 15000
-        ).length;
+        const purchaseStats = await ConversionModel.aggregate([
+            {
+                $match: {
+                    siteId: { $in: sites },
+                    createdAt: todayRange
+                }
+            },
+            {
+                $count: "total"
+            }
+        ]);
 
-        const rejectionRate = calculatePercentage(bounce, all);
-
-        const checkoutStart = await EventModel.countDocuments({
-            siteId: { $in: sites },
-            type: "checkout_start"
-        });
-
-        const purchases = await ConversionModel.countDocuments({
-            siteId: { $in: sites }
-        });
+        const purchases = purchaseStats[0]?.total || 0;
 
         const validPurchases = Math.min(purchases, checkoutStart);
         const checkoutAbandonment = checkoutStart

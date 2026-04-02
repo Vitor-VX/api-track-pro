@@ -70,10 +70,6 @@ export class MetricsService {
             $lte: endOfToday()
         };
 
-        console.log(todayRange.$gte);
-        console.log(todayRange.$lte);
-        
-
         const visitorsToday = await SessionModel.countDocuments({
             siteId: { $in: siteIds },
             createdAt: todayRange
@@ -157,24 +153,57 @@ export class MetricsService {
             sites: siteMetrics
         };
     }
-
     static async siteMetrics(userId: string, siteId: string) {
         const site = await SiteModel.findOne({ _id: siteId, ownerId: userId });
         if (!site) throw new AppError(MESSAGES.siteNotFound, 404);
 
-        const sessions = await SessionModel.countDocuments({ siteId });
-        const visitors = await SessionModel.distinct("visitorId", { siteId }).then(ids => ids.length);
+        const todayRange = {
+            $gte: startOfToday(),
+            $lte: endOfToday()
+        };
 
-        const conversions = await ConversionModel.countDocuments({ siteId });
+        const sessions = await SessionModel.countDocuments({
+            siteId,
+            createdAt: todayRange
+        });
+
+        const visitors = await SessionModel.distinct("visitorId", {
+            siteId,
+            createdAt: todayRange
+        }).then(ids => ids.length);
+
+        const conversions = await ConversionModel.countDocuments({
+            siteId,
+            createdAt: todayRange
+        });
+
         const revenueDoc = await ConversionModel.aggregate([
-            { $match: { siteId: new Types.ObjectId(siteId) } },
-            { $group: { _id: null, total: { $sum: '$value' } } }
+            {
+                $match: {
+                    siteId: new Types.ObjectId(siteId),
+                    createdAt: todayRange
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: "$value" }
+                }
+            }
         ]);
+
         const revenue = revenueDoc[0]?.total || 0;
         const conversionRate = calculatePercentage(conversions, visitors);
         const averageTicket = conversions > 0 ? revenue / conversions : 0;
 
-        return { visitors, sessions, conversions, revenue, conversionRate, averageTicket };
+        return {
+            visitors,
+            sessions,
+            conversions,
+            revenue,
+            conversionRate,
+            averageTicket
+        };
     }
 
     static async performanceLast7Days(userId: string, siteId?: string) {

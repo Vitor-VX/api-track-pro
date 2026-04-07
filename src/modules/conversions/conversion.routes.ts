@@ -28,6 +28,7 @@ const validateCreateConversion = [
 const validate = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    console.log("VALIDATION ERROR:", errors.array());
     return errorResponse(res, "Validation failed", 400);
   }
   next();

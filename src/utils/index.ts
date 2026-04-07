@@ -10,11 +10,15 @@ export const calculatePercentage = (part: number, total: number): number => {
 };
 
 export const startOfToday = (): Date => {
-  return moment.tz(TZ).startOf("day").toDate();
+  return moment.tz(TZ).startOf("day").utc().toDate();
 };
 
 export const endOfToday = (): Date => {
   return moment.tz(TZ).endOf("day").toDate();
+};
+
+export const startOfTomorrow = (): Date => {
+  return moment.tz(TZ).add(1, "day").startOf("day").utc().toDate();
 };
 
 export const last7Days = (): Date[] => {
